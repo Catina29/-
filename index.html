@@ -369,30 +369,62 @@
             }
         });
 
-        async function loadCloudData() {
+        
+async function loadCloudData() {
             if (!currentUser) return;
-            const { data, error } = await supabase
-                .from('user_vocab')
-                .select('vocab_data')
-                .eq('user_id', currentUser.id)
-                .maybeSingle();
-            if (!error && data?.vocab_data) {
-                books = data.vocab_data;
-                if (!books[currentBookName]) currentBookName = Object.keys(books)[0] || '默认词书';
-            } else {
-                await saveCloudData();
+
+            try {
+                const { data, error } = await supabase
+                    .from('user_vocab')
+                    .select('vocab_data, updated_at')
+                    .eq('user_id', currentUser.id)
+                    .order('updated_at', { ascending: false })
+                    .limit(1);
+
+                if (error) {
+                    console.error('读取云端数据失败：', error);
+                    return;
+                }
+
+                if (data && data.length > 0 && data[0].vocab_data) {
+                    books = data[0].vocab_data;
+
+                    if (!books[currentBookName]) {
+                        currentBookName = Object.keys(books)[0] || '默认词书';
+                    }
+                } else {
+                    await saveCloudData();
+                }
+
+                updateBookSelect();
+                renderMainPanels();
+                generateAllPages();
+
+            } catch (err) {
+                console.error('loadCloudData异常：', err);
             }
-            updateBookSelect();
-            renderMainPanels();
-            generateAllPages();
         }
 
         async function saveCloudData() {
             if (!currentUser) return;
-            await supabase
-                .from('user_vocab')
-                .upsert({ user_id: currentUser.id, vocab_data: books, updated_at: new Date() });
+
+            try {
+                const { error } = await supabase
+                    .from('user_vocab')
+                    .upsert({
+                        user_id: currentUser.id,
+                        vocab_data: books,
+                        updated_at: new Date().toISOString()
+                    });
+
+                if (error) {
+                    console.error('保存失败：', error);
+                }
+            } catch (err) {
+                console.error('saveCloudData异常：', err);
+            }
         }
+
 
         async function logout() {
             await supabase.auth.signOut();
