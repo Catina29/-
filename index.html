@@ -143,7 +143,34 @@
             background: #f4f1ea; border-radius: 8px; flex-wrap: wrap;
         }
         .group-badge { background: #d9d4c9; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px; }
-    </style>
+    
+@media (max-width:768px){
+    .bar, .bar-col {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .btn {
+        width: 100%;
+    }
+    input, select, textarea {
+        width: 100%;
+    }
+    .panel-body {
+        grid-template-columns: 1fr;
+    }
+    .columns-wrap {
+        flex-direction: column;
+    }
+    .auth-box {
+        width: 90% !important;
+    }
+    .batch-row-body {
+        grid-template-columns: 1fr !important;
+        padding: 4px !important;
+    }
+}
+
+</style>
 </head>
 <body>
 <div class="app-container">
@@ -417,22 +444,6 @@ async function saveCloudData() {
         console.error('saveCloudData异常：', err);
     }
 }
- = await supabase
-                    .from('user_vocab')
-                    .upsert({
-                        user_id: currentUser.id,
-                        vocab_data: books,
-                        updated_at: new Date().toISOString()
-                    });
-
-                if (error) {
-                    console.error('保存失败：', error);
-                }
-            } catch (err) {
-                console.error('saveCloudData异常：', err);
-            }
-        }
-
 
         async function logout() {
             await supabase.auth.signOut();
@@ -458,13 +469,6 @@ function updateUserUI() {
         if (loginBtnNew) loginBtnNew.addEventListener('click', () => { authPopup.style.display = 'flex'; });
     }
 }
-</span> <button class="btn btn-sm" id="logoutBtn">退出</button>`;
-                document.getElementById('logoutBtn').addEventListener('click', logout);
-            } else {
-                userArea.innerHTML = `<button class="btn btn-sm" id="loginBtn">登录 / 注册</button>`;
-                document.getElementById('loginBtn').addEventListener('click', () => { authPopup.style.display = 'flex'; });
-            }
-        }
 
         // 初始化认证状态
         (async function initAuth() {
@@ -509,6 +513,10 @@ function updateUserUI() {
 
         // ========== 原有功能（完全不变，只把原来的 saveBooks 调用替换为上面的函数） ==========
         function loadBooks() {
+    if(currentUser === null){
+        books = { '默认词书': { batches: [] } };
+        return;
+    }
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) { try { books = JSON.parse(stored); } catch (e) { books = {}; } }
             if (!books || Object.keys(books).length === 0) books = { '默认词书': { batches: [] } };
