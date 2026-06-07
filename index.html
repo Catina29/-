@@ -446,9 +446,19 @@ async function saveCloudData() {
             generateAllPages();
         }
 
-        function updateUserUI() {
-            if (currentUser) {
-                userArea.innerHTML = `<span>${currentUser.email}</span> <button class="btn btn-sm" id="logoutBtn">退出</button>`;
+        
+function updateUserUI() {
+    if (currentUser) {
+        userArea.innerHTML = `<span>${currentUser.email}</span> <button class="btn btn-sm" id="logoutBtn">退出</button>`;
+        const logoutBtnNew = document.getElementById('logoutBtn');
+        if (logoutBtnNew) logoutBtnNew.addEventListener('click', logout);
+    } else {
+        userArea.innerHTML = `<button class="btn btn-sm" id="loginBtn">登录 / 注册</button>`;
+        const loginBtnNew = document.getElementById('loginBtn');
+        if (loginBtnNew) loginBtnNew.addEventListener('click', () => { authPopup.style.display = 'flex'; });
+    }
+}
+</span> <button class="btn btn-sm" id="logoutBtn">退出</button>`;
                 document.getElementById('logoutBtn').addEventListener('click', logout);
             } else {
                 userArea.innerHTML = `<button class="btn btn-sm" id="loginBtn">登录 / 注册</button>`;
