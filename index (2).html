@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=2.0">
+    <title>默写词表 · 智能排版 · 云同步</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f4f2ef; font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            display: flex; justify-content: center; padding: 24px 16px;
+        }
+        .app-container {
+            max-width: 1100px; width: 100%; background: #fff;
+            border: 1px solid #e2ddd5; border-radius: 16px;
+            padding: 24px 20px; display: flex; flex-direction: column; gap: 18px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+        h1 { font-weight: 500; color: #2c2a27; font-size: 1.6rem; padding-bottom: 12px; border-bottom: 1px solid #e8e3d9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .user-area { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 10px; }
+        .bar {
+            background: #fafaf8; padding: 12px 16px; border-radius: 10px; border: 1px solid #e8e3d9;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+        }
+        .bar-col { flex-direction: column; align-items: flex-start; }
+        select, input[type="text"], input[type="number"], input[type="email"], input[type="password"] {
+            padding: 8px 14px; border-radius: 8px; border: 1px solid #d4cfc4;
+            background: white; font-size: 0.9rem; color: #2c2a27; outline: none; font-family: inherit;
+        }
+        .btn {
+            padding: 8px 16px; border-radius: 8px; font-weight: 480; color: #3e3b34;
+            cursor: pointer; border: 1px solid #d4cfc4; background: #f7f5f0; font-size: 0.9rem;
+            display: inline-flex; align-items: center; gap: 6px; transition: 0.15s; user-select: none; white-space: nowrap;
+        }
+        .btn:hover { background: #ece8dd; }
+        .btn-primary { background: #3e3b34; color: white; border-color: #2c2a27; }
+        .btn-primary:hover { background: #2c2a27; }
+        .btn-sm { padding: 4px 10px; font-size: 0.78rem; border-radius: 6px; }
+        textarea {
+            width: 100%; padding: 12px 14px; border: 1px solid #d4cfc4; border-radius: 8px;
+            background: #fdfdfb; font-size: 0.95rem; font-family: inherit; resize: vertical; outline: none;
+        }
+        .main-panels { display: flex; flex-direction: column; gap: 14px; }
+        .panel { background: #fafaf8; border: 1px solid #e8e3d9; border-radius: 10px; overflow: hidden; }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; background: #f4f1ea; border-bottom: 1px solid #e8e3d9; cursor: pointer; flex-wrap: wrap; gap: 8px;
+        }
+        .panel-header h3 { font-weight: 500; font-size: 0.95rem; }
+        .count-badge { background: #e8e3d9; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
+        .panel-body {
+            padding: 12px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr));
+            gap: 8px; max-height: 280px; overflow-y: auto; background: white;
+        }
+        .panel-body.collapsed { display: none; }
+        .word-card {
+            background: #f9f8f6; border: 1px solid #d9d4c9; padding: 6px 12px; border-radius: 6px;
+            font-size: 0.85rem; cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; user-select: none;
+        }
+        .word-card.selected { background: #3e3b34; border-color: #2c2a27; color: white; }
+        .sheet-container { margin: 20px auto; display: flex; flex-direction: column; align-items: center; }
+        .a4-sheet {
+            background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #ddd;
+            font-family: 'Times New Roman', 'Georgia', '宋体', serif; box-sizing: border-box;
+            padding: 12mm 15mm; margin-bottom: 20px;
+        }
+        .sheet-top {
+            border-bottom: 1.5px solid #b3ad9e; padding-bottom: 8px; margin-bottom: 12px;
+            white-space: pre-wrap; font-size: 14px;
+        }
+        .sheet-title { text-align: center; font-size: 18px; font-weight: 500; margin: 8px 0 14px; }
+        .columns-wrap { display: flex; gap: 24px; }
+        .col { flex: 1; }
+        .word-line {
+            display: flex; align-items: baseline; border-bottom: 1px dotted #c5bfb1;
+            padding: 6px 2px; font-size: 16px;
+        }
+        .word-num { width: 28px; color: #7a7567; flex-shrink: 0; text-align: right; margin-right: 6px; }
+        .word-text { flex: 1; text-align: left; }
+        .answer-hint { font-size: 12px; color: #888; margin-left: 8px; opacity: 0.8; white-space: nowrap; }
+        @media print {
+            body { background: white; margin: 0; }
+            .app-container { box-shadow: none; border: none; padding: 0; background: transparent; }
+            .btn, select, textarea, .bar, .main-panels, .modal-overlay, .auth-popup { display: none; }
+            .a4-sheet { box-shadow: none; border: none; margin: 0; page-break-after: always; }
+            .a4-sheet:last-child { page-break-after: auto; }
+            .answer-hint { color: #555; }
+        }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal { background: white; border-radius: 12px; max-width: 960px; width: 95%; max-height: 85vh; overflow-y: auto; padding: 20px; }
+        .auth-popup {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 2000;
+        }
+        .auth-box {
+            background: white; border-radius: 16px; padding: 24px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .history-popup {
+            background: white; border: 1px solid #ddd; border-radius: 8px; padding: 8px;
+            position: absolute; top: 100%; left: 0; width: 200px; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: none; max-height: 150px; overflow-y: auto;
+        }
+        .relative { position: relative; }
+        .batch-row {
+            border: 1px solid #e8e3d9; border-radius: 8px; margin-bottom: 8px; overflow: hidden;
+        }
+        .batch-row-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 8px 14px;
+            background: #f9f8f6; cursor: pointer; user-select: none; gap: 10px; flex-wrap: wrap;
+        }
+        .batch-row-header:hover { background: #f0ede5; }
+        .batch-row-body {
+            display: none; padding: 10px 14px; background: white; border-top: 1px solid #e8e3d9;
+            max-height: 300px; overflow-y: auto;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+        .batch-row-body.open { display: grid; }
+        .batch-word-item {
+            background: #f9f8f6; border: 1px solid #d9d4c9; padding: 8px 12px; border-radius: 8px;
+            font-size: 0.9rem; cursor: pointer; user-select: none;
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            transition: background 0.1s;
+        }
+        .batch-word-item.selected { background: #3e3b34; border-color: #2c2a27; color: white; }
+        .batch-word-text {
+            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+            font-weight: 500;
+        }
+        .batch-word-text small { font-weight: 400; opacity: 0.8; }
+        .batch-word-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .batch-word-actions button { padding: 3px 8px; font-size: 0.75rem; line-height: 1.3; border-radius: 4px; }
+        .setting-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .setting-group label { font-size: 0.85rem; color: #555; white-space: nowrap; }
+        .extract-bar {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px;
+            background: #f4f1ea; border-radius: 8px; flex-wrap: wrap;
+        }
+        .group-badge { background: #d9d4c9; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <h1>
+        📘 默写词表 · 智能排版
+        <span class="user-area" id="userArea">
+            <button class="btn btn-sm" id="loginBtn">登录 / 注册</button>
+        </span>
+    </h1>
+
+    <div class="bar">
+        <select id="bookSelect"></select>
+        <button class="btn" id="newBookBtn">➕ 新词书</button>
+        <button class="btn" id="deleteBookBtn">🗑️ 删除</button>
+        <span id="wordCountDisplay" style="margin-left:auto;">0 个单词</span>
+    </div>
+
+    <div class="bar bar-col">
+        <label>✏️ 添加单词（每行一个英文，或“英文短语 中文”）</label>
+        <textarea id="englishInput" placeholder="apple&#10;book 书&#10;show up 出现"></textarea>
+        <div style="display:flex; gap:12px; width:100%;">
+            <input type="text" id="batchNameInput" placeholder="批次名称（留空用时间）" style="flex:1;">
+            <button class="btn btn-primary" id="fetchWordsBtn">获取释义并加入</button>
+            <span id="fetchStatus" style="font-size:0.85rem;"></span>
+        </div>
+    </div>
+
+    <div class="bar">
+        <span>🔍 搜索：</span>
+        <input type="text" id="searchInput" placeholder="输入英文单词">
+        <button class="btn" id="searchBtn">搜索</button>
+        <button class="btn" id="clearSearchBtn">清除</button>
+        <div class="relative">
+            <button class="btn" id="historyBtn">📋 历史</button>
+            <div class="history-popup" id="historyPopup"></div>
+        </div>
+    </div>
+    <div id="searchResults" style="display:none; background:#f9f8f6; border:1px solid #e8e3d9; border-radius:10px; padding:12px;"></div>
+
+    <div class="main-panels" id="mainPanels"></div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" id="manageBatchesBtn">📋 管理批次</button>
+        <button class="btn" id="markMasteredBtn">⭐ 标熟选中单词</button>
+        <button class="btn" id="cancelMasteredBtn">↩️ 取消标熟选中</button>
+    </div>
+
+    <div class="bar">
+        <span>🖨️ 纸张：</span>
+        <select id="paperSize">
+            <option value="A4">A4 竖版</option>
+            <option value="A5">A5 竖版</option>
+            <option value="A4L">A4 横版</option>
+            <option value="A5L">A5 横版</option>
+            <option value="custom">自定义</option>
+        </select>
+        <span id="customSizeInputs" style="display:none;">
+            <input type="number" id="customWidth" placeholder="宽mm" value="210" style="width:70px;"> x
+            <input type="number" id="customHeight" placeholder="高mm" value="297" style="width:70px;">
+        </span>
+        <span>中文大小：</span>
+        <select id="chineseFontSize"><option value="12">12px</option><option value="14" selected>14px</option><option value="16">16px</option><option value="18">18px</option></select>
+        <button class="btn" id="applyPaperBtn">应用</button>
+    </div>
+
+    <div class="bar bar-col" style="gap:10px;">
+        <label style="font-weight:500;">📝 词表顶部自定义文本</label>
+        <div style="display:flex; gap:12px; width:100%; flex-wrap:wrap; align-items:center;">
+            <input type="text" id="topTextInput" placeholder="姓名：______  日期：______  单元：______" style="flex:2; min-width:200px;">
+            <div class="setting-group">
+                <label>字体：</label>
+                <select id="topTextFont">
+                    <option value="宋体, SimSun, serif">宋体</option>
+                    <option value="楷体, KaiTi, STKaiti, serif">楷体</option>
+                    <option value="黑体, SimHei, sans-serif">黑体</option>
+                    <option value="仿宋, FangSong, STFangsong, serif">仿宋</option>
+                    <option value="Times New Roman, Georgia, serif" selected>Times New Roman</option>
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="Georgia, serif">Georgia</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>字号：</label>
+                <select id="topTextSize"><option value="12">12px</option><option value="14" selected>14px</option><option value="16">16px</option><option value="18">18px</option><option value="20">20px</option></select>
+            </div>
+            <div class="setting-group">
+                <label>对齐：</label>
+                <select id="topTextAlign"><option value="left">靠左</option><option value="center">居中</option><option value="right">靠右</option></select>
+            </div>
+            <div class="setting-group">
+                <label><input type="checkbox" id="topTextBold"> 加粗</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="bar">
+        <label><input type="radio" name="displayMode" value="english" checked> 英文</label>
+        <label><input type="radio" name="displayMode" value="chinese"> 中文</label>
+        <button class="btn" id="toggleAnswerBtn">👁️ 显示答案</button>
+        <button class="btn btn-primary" id="generateBtn">🔀 生成乱序词表</button>
+        <button class="btn" id="reshuffleBtn">🔄 重新打乱</button>
+        <button class="btn" id="printBtn">🖨️ 打印</button>
+    </div>
+
+    <div class="sheet-container" id="sheetContainer"></div>
+</div>
+
+<div class="modal-overlay" id="confirmModal" style="display:none;">
+    <div class="modal" style="text-align:center;">
+        <p>确定把选中的单词转移到已标熟文件夹吗？</p>
+        <div style="margin-top:16px; display:flex; gap:12px; justify-content:center;">
+            <button class="btn" id="confirmCancel">取消</button>
+            <button class="btn btn-primary" id="confirmOk">确定</button>
+        </div>
+    </div>
+</div>
+
+<!-- 登录/注册弹窗 -->
+<div class="auth-popup" id="authPopup" style="display:none;">
+    <div class="auth-box">
+        <h3 id="authTitle">登录</h3>
+        <input type="email" id="authEmail" placeholder="邮箱" style="width:100%; margin:10px 0;"><br>
+        <input type="password" id="authPassword" placeholder="密码" style="width:100%; margin:10px 0;"><br>
+        <button class="btn btn-primary" id="authSubmit" style="width:100%;">登录</button>
+        <p style="margin-top:12px; font-size:0.8rem;">
+            <a href="#" id="toggleAuthMode">没有账号？去注册</a>
+        </p>
+        <p id="authError" style="color:#c44; font-size:0.8rem; margin-top:8px;"></p>
+    </div>
+</div>
+
+<script>
+    (() => {
+        // ========== 改成你自己的 Supabase 配置 ==========
+        const SUPABASE_URL = 'https://yodrotzyxviruueyqbfv.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_unK4laaAf_OGQYNOy_eKxg_rt4VntR2';
+        // ================================================
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const STORAGE_KEY = 'vocab_smart_v2';
+        const MASTERED_BATCH_NAME = '⭐ 已标熟';
+        let books = {};
+        let currentBookName = '默认词书';
+        let selectedEnglish = new Set();
+        let currentShuffledWords = [];
+        let answerVisible = false;
+        let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+        let currentUser = null;
+
+        const cache = JSON.parse(localStorage.getItem('wordCache_smart') || '{}');
+        const saveCache = () => localStorage.setItem('wordCache_smart', JSON.stringify(cache));
+
+        // DOM 元素
+        const bookSelect = document.getElementById('bookSelect');
+        const englishInput = document.getElementById('englishInput');
+        const batchNameInput = document.getElementById('batchNameInput');
+        const fetchStatus = document.getElementById('fetchStatus');
+        const mainPanels = document.getElementById('mainPanels');
+        const sheetContainer = document.getElementById('sheetContainer');
+        const searchInput = document.getElementById('searchInput');
+        const searchResultsDiv = document.getElementById('searchResults');
+        const historyBtn = document.getElementById('historyBtn');
+        const historyPopup = document.getElementById('historyPopup');
+        const confirmModal = document.getElementById('confirmModal');
+        const paperSize = document.getElementById('paperSize');
+        const customSizeInputs = document.getElementById('customSizeInputs');
+        const customWidth = document.getElementById('customWidth');
+        const customHeight = document.getElementById('customHeight');
+        const chineseFontSize = document.getElementById('chineseFontSize');
+        const radioEnglish = document.querySelector('input[value="english"]');
+        const radioChinese = document.querySelector('input[value="chinese"]');
+        const topTextInput = document.getElementById('topTextInput');
+        const topTextFont = document.getElementById('topTextFont');
+        const topTextSize = document.getElementById('topTextSize');
+        const topTextAlign = document.getElementById('topTextAlign');
+        const topTextBold = document.getElementById('topTextBold');
+        const toggleAnswerBtn = document.getElementById('toggleAnswerBtn');
+        const userArea = document.getElementById('userArea');
+        const loginBtn = document.getElementById('loginBtn');
+        const authPopup = document.getElementById('authPopup');
+        const authTitle = document.getElementById('authTitle');
+        const authEmail = document.getElementById('authEmail');
+        const authPassword = document.getElementById('authPassword');
+        const authSubmit = document.getElementById('authSubmit');
+        const toggleAuthMode = document.getElementById('toggleAuthMode');
+        const authError = document.getElementById('authError');
+
+        let authMode = 'login';
+
+        // ========== 认证与云同步 ==========
+        loginBtn.addEventListener('click', () => { authPopup.style.display = 'flex'; });
+
+        toggleAuthMode.addEventListener('click', (e) => {
+            e.preventDefault();
+            authMode = authMode === 'login' ? 'register' : 'login';
+            authTitle.textContent = authMode === 'login' ? '登录' : '注册';
+            authSubmit.textContent = authMode === 'login' ? '登录' : '注册';
+            toggleAuthMode.innerHTML = authMode === 'login' ? '没有账号？去注册' : '已有账号？去登录';
+            authError.textContent = '';
+        });
+
+        authSubmit.addEventListener('click', async () => {
+            const email = authEmail.value.trim();
+            const password = authPassword.value.trim();
+            if (!email || !password) { authError.textContent = '请填写邮箱和密码'; return; }
+            let result;
+            if (authMode === 'login') {
+                result = await supabase.auth.signInWithPassword({ email, password });
+            } else {
+                result = await supabase.auth.signUp({ email, password });
+            }
+            if (result.error) {
+                authError.textContent = result.error.message;
+            } else {
+                authPopup.style.display = 'none';
+                currentUser = result.data.user;
+                updateUserUI();
+                if (!result.data.session) {
+                    alert('注册成功。若Supabase开启了邮箱验证，请先到邮箱点击验证链接后再登录。');
+                }
+                await loadCloudData();
+            }
+        });
+
+        async function loadCloudData() {
+            if (!currentUser) return;
+            const { data, error } = await supabase
+                .from('user_vocab')
+                .select('vocab_data')
+                .eq('user_id', currentUser.id)
+                .maybeSingle();
+            if (!error && data?.vocab_data) {
+                books = data.vocab_data;
+                if (!books[currentBookName]) currentBookName = Object.keys(books)[0] || '默认词书';
+            } else {
+                await saveCloudData();
+            }
+            updateBookSelect();
+            renderMainPanels();
+            generateAllPages();
+        }
+
+        async function saveCloudData() {
+            if (!currentUser) return;
+            await supabase
+                .from('user_vocab')
+                .upsert({ user_id: currentUser.id, vocab_data: books, updated_at: new Date() });
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            localStorage.removeItem(STORAGE_KEY);
+            currentUser = null;
+            books = {};
+            currentBookName = '默认词书';
+            updateUserUI();
+            updateBookSelect();
+            renderMainPanels();
+            generateAllPages();
+        }
+
+        function updateUserUI() {
+            if (currentUser) {
+                userArea.innerHTML = `<span>${currentUser.email}</span> <button class="btn btn-sm" id="logoutBtn">退出</button>`;
+                document.getElementById('logoutBtn').addEventListener('click', logout);
+            } else {
+                userArea.innerHTML = `<button class="btn btn-sm" id="loginBtn">登录 / 注册</button>`;
+                document.getElementById('loginBtn').addEventListener('click', () => { authPopup.style.display = 'flex'; });
+            }
+        }
+
+        // 初始化认证状态
+        (async function initAuth() {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                currentUser = data.session.user;
+                updateUserUI();
+                await loadCloudData();
+            } else {
+                loadBooks();
+                updateBookSelect();
+                renderMainPanels();
+                generateAllPages();
+                updateUserUI();
+            }
+        })();
+
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                currentUser = session.user;
+                updateUserUI();
+                loadCloudData();
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                updateUserUI();
+                books = {};
+                currentBookName = '默认词书';
+                updateBookSelect();
+                renderMainPanels();
+                generateAllPages();
+            }
+        });
+
+        // 重写 saveBooks 使其同时保存本地和云端
+        function saveBooks() {
+            if (currentUser) {
+                saveCloudData();
+            } else {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+            }
+        }
+
+        // ========== 原有功能（完全不变，只把原来的 saveBooks 调用替换为上面的函数） ==========
+        function loadBooks() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) { try { books = JSON.parse(stored); } catch (e) { books = {}; } }
+            if (!books || Object.keys(books).length === 0) books = { '默认词书': { batches: [] } };
+            if (!books[currentBookName]) currentBookName = Object.keys(books)[0] || '默认词书';
+            for (const [name, data] of Object.entries(books)) {
+                if (!data.batches) books[name] = { batches: [] };
+                if (!data.batches.some(b => b.name === MASTERED_BATCH_NAME)) {
+                    data.batches.push({ id: 'mastered_' + name, name: MASTERED_BATCH_NAME, words: [] });
+                }
+            }
+        }
+        function getBook() { return books[currentBookName]; }
+        function getAllWords() { return getBook().batches.flatMap(b => b.words).filter(w => !w.mastered); }
+        function getMasteredWords() { const b = getBook().batches.find(b => b.name === MASTERED_BATCH_NAME); return b ? b.words : []; }
+        function getRegularBatches() { return getBook().batches.filter(b => b.name !== MASTERED_BATCH_NAME && !b.parentId); }
+
+        function updateBookSelect() {
+            bookSelect.innerHTML = '';
+            Object.keys(books).forEach(name => {
+                const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
+                if (name === currentBookName) opt.selected = true;
+                bookSelect.appendChild(opt);
+            });
+            document.getElementById('wordCountDisplay').textContent = `${getAllWords().length} 个单词`;
+        }
+
+        function switchBook(name) {
+            if (!books[name]) return;
+            currentBookName = name;
+            selectedEnglish.clear();
+            updateBookSelect();
+            renderMainPanels();
+            generateAllPages();
+        }
+
+        function renderMainPanels() {
+            const regular = getRegularBatches();
+            const all = getAllWords();
+            const mastered = getMasteredWords();
+            mainPanels.innerHTML = '';
+            if (regular.length) {
+                const latest = regular[0];
+                mainPanels.appendChild(createPanel(`📌 最新：${latest.name}`, latest.words.filter(w=>!w.mastered), true));
+                if (regular.length > 1) {
+                    const second = regular[1];
+                    mainPanels.appendChild(createPanel(`📌 次新：${second.name}`, second.words.filter(w=>!w.mastered), false));
+                }
+            }
+            mainPanels.appendChild(createPanel('📚 全部单词', all, false));
+            if (mastered.length) mainPanels.appendChild(createPanel('⭐ 已标熟', mastered, false));
+            bindAllSwipe();
+        }
+
+        function createPanel(title, words, expanded) {
+            const panel = document.createElement('div'); panel.className = 'panel';
+            const header = document.createElement('div'); header.className = 'panel-header';
+            header.innerHTML = `<h3>${title} <span class="count-badge">${words.length}</span></h3>`;
+            const toggleIcon = document.createElement('span'); toggleIcon.textContent = expanded ? '▲' : '▼';
+            header.appendChild(toggleIcon);
+            const btnGroup = document.createElement('div'); btnGroup.style.display='flex'; btnGroup.style.gap='6px';
+            const selectAll = document.createElement('button'); selectAll.className='btn btn-sm'; selectAll.textContent='全选';
+            const deselectAll = document.createElement('button'); deselectAll.className='btn btn-sm'; deselectAll.textContent='全不选';
+            btnGroup.appendChild(selectAll); btnGroup.appendChild(deselectAll);
+            header.appendChild(btnGroup);
+            const body = document.createElement('div'); body.className = 'panel-body' + (expanded ? '' : ' collapsed');
+            words.forEach(w => {
+                const card = document.createElement('div');
+                card.className = 'word-card' + (selectedEnglish.has(w.english.toLowerCase()) ? ' selected' : '');
+                card.dataset.english = w.english;
+                card.textContent = `${w.english} ${w.chinese}`;
+                card.title = `${w.english} ${w.chinese}`;
+                body.appendChild(card);
+            });
+            header.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                body.classList.toggle('collapsed');
+                toggleIcon.textContent = body.classList.contains('collapsed') ? '▼' : '▲';
+            });
+            selectAll.addEventListener('click', (e) => { e.stopPropagation(); words.forEach(w => selectedEnglish.add(w.english.toLowerCase())); refreshAllCards(); });
+            deselectAll.addEventListener('click', (e) => { e.stopPropagation(); words.forEach(w => selectedEnglish.delete(w.english.toLowerCase())); refreshAllCards(); });
+            panel.appendChild(header); panel.appendChild(body);
+            return panel;
+        }
+
+        function refreshAllCards() {
+            document.querySelectorAll('.word-card').forEach(c => {
+                const eng = c.dataset.english?.toLowerCase();
+                if (eng) c.classList.toggle('selected', selectedEnglish.has(eng));
+            });
+            document.querySelectorAll('.batch-word-item').forEach(c => {
+                const eng = c.dataset.english?.toLowerCase();
+                if (eng) c.classList.toggle('selected', selectedEnglish.has(eng));
+            });
+        }
+
+        function bindAllSwipe() { document.querySelectorAll('.panel-body, .batch-row-body').forEach(b => bindSwipe(b)); }
+        function bindSwipe(container) {
+            let dragging = false, startEng = null, targetState = false;
+            container.addEventListener('mousedown', (e) => {
+                const card = e.target.closest('.word-card') || e.target.closest('.batch-word-item');
+                if (!card) return;
+                e.preventDefault(); dragging = true; startEng = card.dataset.english;
+                targetState = !selectedEnglish.has(startEng.toLowerCase());
+                updateCardSelection(startEng, targetState);
+            });
+            container.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const card = e.target.closest('.word-card') || e.target.closest('.batch-word-item');
+                if (!card || card.dataset.english === startEng) return;
+                const cards = [...container.querySelectorAll('.word-card, .batch-word-item')];
+                const s = cards.findIndex(c => c.dataset.english === startEng);
+                const cur = cards.findIndex(c => c.dataset.english === card.dataset.english);
+                if (s===-1||cur===-1) return;
+                for (let i = Math.min(s,cur); i <= Math.max(s,cur); i++) updateCardSelection(cards[i].dataset.english, targetState);
+            });
+            window.addEventListener('mouseup', () => { dragging = false; startEng = null; });
+        }
+        function updateCardSelection(eng, state) {
+            if (state) selectedEnglish.add(eng.toLowerCase()); else selectedEnglish.delete(eng.toLowerCase());
+            document.querySelectorAll(`.word-card[data-english="${eng}"], .batch-word-item[data-english="${eng}"]`).forEach(c => c.classList.toggle('selected', state));
+        }
+
+        function findWordLocation(english) {
+            for (let batch of getBook().batches) {
+                const idx = batch.words.findIndex(w => w.english.toLowerCase() === english.toLowerCase());
+                if (idx !== -1) return { batch, index: idx, word: batch.words[idx] };
+            }
+            return null;
+        }
+        function moveWordToMastered(english) {
+            const loc = findWordLocation(english); if (!loc || loc.word.mastered) return false;
+            loc.word.mastered = true;
+            loc.word.sourceBatchId = loc.batch.id;
+            loc.batch.words.splice(loc.index, 1);
+            getBook().batches.find(b => b.name === MASTERED_BATCH_NAME).words.push(loc.word);
+            selectedEnglish.delete(english.toLowerCase());
+            return true;
+        }
+        function cancelMasteredWord(english) {
+            const masteredBatch = getBook().batches.find(b => b.name === MASTERED_BATCH_NAME);
+            if (!masteredBatch) return false;
+            const idx = masteredBatch.words.findIndex(w => w.english.toLowerCase() === english.toLowerCase());
+            if (idx === -1) return false;
+            const word = masteredBatch.words[idx];
+            const sourceBatchId = word.sourceBatchId;
+            let targetBatch = getBook().batches.find(b => b.id === sourceBatchId);
+            if (!targetBatch) {
+                targetBatch = getRegularBatches()[0] || getBook().batches.find(b => b.name !== MASTERED_BATCH_NAME);
+                if (!targetBatch) {
+                    targetBatch = { id: Date.now().toString(), name: '恢复批次', words: [] };
+                    getBook().batches.unshift(targetBatch);
+                }
+            }
+            word.mastered = false;
+            delete word.sourceBatchId;
+            targetBatch.words.push(word);
+            masteredBatch.words.splice(idx, 1);
+            selectedEnglish.delete(english.toLowerCase());
+            return true;
+        }
+        function deleteWord(english) {
+            const loc = findWordLocation(english); if (!loc) return false;
+            loc.batch.words.splice(loc.index, 1);
+            selectedEnglish.delete(english.toLowerCase());
+            return true;
+        }
+        function moveWordsToBatch(englishList, targetBatchId) {
+            const book = getBook();
+            const targetBatch = book.batches.find(b => b.id === targetBatchId);
+            if (!targetBatch) return 0;
+            let moved = 0;
+            englishList.forEach(eng => {
+                const loc = findWordLocation(eng);
+                if (loc && loc.batch.id !== targetBatchId) {
+                    loc.batch.words.splice(loc.index, 1);
+                    targetBatch.words.push(loc.word);
+                    selectedEnglish.delete(eng.toLowerCase());
+                    moved++;
+                }
+            });
+            return moved;
+        }
+
+        document.getElementById('markMasteredBtn').addEventListener('click', () => {
+            if (selectedEnglish.size === 0) return alert('请先选中单词');
+            confirmModal.style.display = 'flex';
+            document.getElementById('confirmOk').onclick = () => {
+                let moved = 0;
+                selectedEnglish.forEach(eng => { if (moveWordToMastered(eng)) moved++; });
+                saveBooks(); selectedEnglish.clear(); renderMainPanels(); updateBookSelect(); generateAllPages();
+                confirmModal.style.display = 'none';
+                if (moved > 0) alert(`已标熟 ${moved} 个单词`);
+            };
+            document.getElementById('confirmCancel').onclick = () => { confirmModal.style.display = 'none'; };
+        });
+
+        document.getElementById('cancelMasteredBtn').addEventListener('click', () => {
+            if (selectedEnglish.size === 0) return alert('请先选中已标熟的单词');
+            let count = 0;
+            selectedEnglish.forEach(eng => { if (cancelMasteredWord(eng)) count++; });
+            if (count > 0) {
+                saveBooks(); selectedEnglish.clear(); renderMainPanels(); updateBookSelect(); generateAllPages();
+                alert(`已取消标熟 ${count} 个单词`);
+            } else {
+                alert('选中的单词中没有已标熟的，或取消失败');
+            }
+        });
+
+        function addSearchHistory(term) {
+            searchHistory = [term, ...searchHistory.filter(t => t !== term)].slice(0, 5);
+            localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+        }
+        function renderHistory() {
+            historyPopup.innerHTML = searchHistory.length ? searchHistory.map(t => `<div style="padding:6px; cursor:pointer;" class="hist-item">${t}</div>`).join('') : '<div style="padding:6px; color:#888;">无历史</div>';
+            historyPopup.querySelectorAll('.hist-item').forEach(item => item.addEventListener('click', (e) => {
+                searchInput.value = e.target.textContent; historyPopup.style.display = 'none';
+                document.getElementById('searchBtn').click();
+            }));
+        }
+        historyBtn.addEventListener('click', () => { renderHistory(); historyPopup.style.display = historyPopup.style.display === 'block' ? 'none' : 'block'; });
+        document.addEventListener('click', (e) => { if (!historyBtn.contains(e.target) && !historyPopup.contains(e.target)) historyPopup.style.display = 'none'; });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const q = searchInput.value.trim().toLowerCase(); if (!q) return;
+            addSearchHistory(q);
+            const results = []; getBook().batches.forEach(b => b.words.forEach(w => { if (w.english.toLowerCase().includes(q)) results.push({...w, batchName: b.name}); }));
+            searchResultsDiv.style.display = 'block';
+            if (!results.length) searchResultsDiv.innerHTML = '<p>未查询到该单词</p>';
+            else searchResultsDiv.innerHTML = results.map(r => `<div style="display:flex; justify-content:space-between; padding:4px 0;"><span>${r.english} ${r.chinese} <small>[${r.batchName}]</small></span><div><button data-mastered="${r.english}" class="btn btn-sm">⭐</button><button data-delete="${r.english}" class="btn btn-sm">🗑️</button></div></div>`).join('');
+            searchResultsDiv.querySelectorAll('[data-mastered]').forEach(b => b.addEventListener('click', (e) => { moveWordToMastered(e.target.dataset.mastered); saveBooks(); renderMainPanels(); generateAllPages(); document.getElementById('searchBtn').click(); }));
+            searchResultsDiv.querySelectorAll('[data-delete]').forEach(b => b.addEventListener('click', (e) => { if(confirm('删除？')){ deleteWord(e.target.dataset.delete); saveBooks(); renderMainPanels(); generateAllPages(); document.getElementById('searchBtn').click(); } }));
+        });
+        document.getElementById('clearSearchBtn').addEventListener('click', () => { searchResultsDiv.style.display='none'; searchInput.value=''; });
+
+        function extractChineseOnly(text) { if (!text) return ''; const m = text.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]+/g); return m ? m.join('；') : ''; }
+        async function fetchChinese(english) {
+            const k = english.toLowerCase().trim(); if (cache[k]) return cache[k];
+            try {
+                const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(english)}&langpair=en|zh`);
+                const d = await r.json(); const t = d.responseData.translatedText || '';
+                const ch = extractChineseOnly(t) || t; cache[k] = ch; saveCache(); return ch;
+            } catch (e) { return english; }
+        }
+
+        async function addWordsFromInput() {
+            const lines = englishInput.value.trim().split(/\n/).filter(l => l.trim());
+            if (!lines.length) { fetchStatus.textContent = '请输入单词'; return; }
+            const book = getBook(); const existing = new Set(book.batches.flatMap(b => b.words).map(w => w.english.toLowerCase()));
+            const entries = [];
+            for (let line of lines) {
+                line = line.trim();
+                const chineseMatch = line.match(/^(.+?)\s+([\u4e00-\u9fff].*)$/);
+                if (chineseMatch) {
+                    const eng = chineseMatch[1].trim();
+                    const ch = chineseMatch[2].trim();
+                    if (!existing.has(eng.toLowerCase())) { entries.push({ english: eng, chinese: ch, mastered: false }); existing.add(eng.toLowerCase()); }
+                } else {
+                    const eng = line.replace(/[^A-Za-z\s]/g, '').trim();
+                    if (eng && /^[A-Za-z\s]+$/.test(eng) && !existing.has(eng.toLowerCase())) { entries.push({ english: eng, chinese: '', mastered: false }); existing.add(eng.toLowerCase()); }
+                }
+            }
+            if (!entries.length) { fetchStatus.textContent = '没有新单词'; return; }
+            fetchStatus.textContent = `获取 ${entries.length} 个释义...`;
+            for (let i = 0; i < entries.length; i += 5) {
+                await Promise.all(entries.slice(i, i+5).map(async e => { if (!e.chinese) e.chinese = await fetchChinese(e.english); }));
+            }
+            const batchName = batchNameInput.value.trim() || new Date().toLocaleString();
+            getBook().batches.unshift({ id: Date.now().toString(), name: batchName, words: entries });
+            saveBooks(); englishInput.value = ''; batchNameInput.value = '';
+            fetchStatus.textContent = `已添加“${batchName}”`; selectedEnglish.clear();
+            renderMainPanels(); updateBookSelect(); generateAllPages();
+        }
+
+        paperSize.addEventListener('change', () => { customSizeInputs.style.display = paperSize.value === 'custom' ? 'inline' : 'none'; });
+        function getPaperDimensions() {
+            const s = paperSize.value;
+            if (s === 'A4') return { w: 210, h: 297 };
+            if (s === 'A5') return { w: 148, h: 210 };
+            if (s === 'A4L') return { w: 297, h: 210 };
+            if (s === 'A5L') return { w: 210, h: 148 };
+            return { w: parseFloat(customWidth.value)||210, h: parseFloat(customHeight.value)||297 };
+        }
+        function getTopTextSettings() {
+            return {
+                text: topTextInput.value || '姓名：______  日期：______  单元：______',
+                font: topTextFont.value || 'Times New Roman, Georgia, serif',
+                size: topTextSize.value || '14',
+                align: topTextAlign.value || 'left',
+                bold: topTextBold.checked
+            };
+        }
+
+        function generateAllPages() {
+            const words = getAllWords().filter(w => selectedEnglish.has(w.english.toLowerCase()));
+            currentShuffledWords = shuffleArray([...words]);
+            renderPages(currentShuffledWords);
+        }
+        function shuffleArray(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+
+        function renderPages(words) {
+            sheetContainer.innerHTML = '';
+            const { w, h } = getPaperDimensions();
+            const isChinese = radioChinese.checked;
+            const chSize = parseInt(chineseFontSize.value);
+            const topSettings = getTopTextSettings();
+            const marginTB = 24; const topArea = 22;
+            const usableHeight = h - marginTB - topArea;
+            const lineHeightMM = isChinese ? (chSize * 0.3528 + 2.5) : (16 * 0.3528 + 2.5);
+            const linesPerPage = Math.floor(usableHeight / lineHeightMM);
+            let cols = 1;
+            if (w >= 250) cols = 3;
+            else if (w >= 160) cols = 2;
+            const wordsPerPage = linesPerPage * cols;
+            const pages = [];
+            for (let i = 0; i < words.length; i += wordsPerPage) pages.push(words.slice(i, i + wordsPerPage));
+            if (!pages.length) pages.push([]);
+
+            pages.forEach((pageWords, idx) => {
+                const sheet = document.createElement('div'); sheet.className = 'a4-sheet';
+                sheet.style.width = w + 'mm'; sheet.style.minHeight = h + 'mm';
+                const topDiv = document.createElement('div'); topDiv.className = 'sheet-top';
+                topDiv.textContent = topSettings.text;
+                topDiv.style.fontFamily = topSettings.font;
+                topDiv.style.fontSize = topSettings.size + 'px';
+                topDiv.style.textAlign = topSettings.align;
+                topDiv.style.fontWeight = topSettings.bold ? 'bold' : 'normal';
+                const titleDiv = document.createElement('div'); titleDiv.className = 'sheet-title';
+                titleDiv.textContent = isChinese ? `英语默写 (中文) ${idx+1}/${pages.length}` : `英语默写 (英文) ${idx+1}/${pages.length}`;
+                const colsWrap = document.createElement('div'); colsWrap.className = 'columns-wrap';
+                const colsArr = [];
+                for (let c = 0; c < cols; c++) { const col = document.createElement('div'); col.className = 'col'; colsArr.push(col); }
+                const perCol = Math.ceil(pageWords.length / cols);
+                for (let i = 0; i < pageWords.length; i++) {
+                    const colIdx = Math.floor(i / perCol); if (colIdx >= cols) break;
+                    const wd = pageWords[i]; const num = i + 1;
+                    let mainText = wd ? (isChinese ? wd.chinese : wd.english) : '';
+                    let answerText = '';
+                    if (answerVisible && wd) {
+                        answerText = isChinese ? wd.english : wd.chinese;
+                    }
+                    const line = document.createElement('div'); line.className = 'word-line';
+                    let html = `<span class="word-num">${num}.</span>`;
+                    html += `<span class="word-text" style="font-size:${isChinese ? chSize + 'px' : '16px'}">${mainText}</span>`;
+                    if (answerText) {
+                        html += `<span class="answer-hint" style="font-size:${Math.max(10, (isChinese ? chSize : 16) - 2)}px; color:#888; margin-left:8px; opacity:0.8;">(${answerText})</span>`;
+                    }
+                    line.innerHTML = html;
+                    colsArr[colIdx].appendChild(line);
+                }
+                colsArr.forEach(c => colsWrap.appendChild(c));
+                sheet.appendChild(topDiv); sheet.appendChild(titleDiv); sheet.appendChild(colsWrap);
+                sheetContainer.appendChild(sheet);
+            });
+            let styleEl = document.getElementById('printStyle');
+            if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = 'printStyle'; document.head.appendChild(styleEl); }
+            styleEl.textContent = `@media print { @page { size: ${w}mm ${h}mm; margin: 10mm; } .sheet-top { font-family: ${topSettings.font} !important; font-size: ${topSettings.size}px !important; text-align: ${topSettings.align} !important; font-weight: ${topSettings.bold ? 'bold' : 'normal'} !important; } }`;
+        }
+
+        toggleAnswerBtn.addEventListener('click', () => {
+            answerVisible = !answerVisible;
+            toggleAnswerBtn.textContent = answerVisible ? '🙈 隐藏答案' : '👁️ 显示答案';
+            if (currentShuffledWords.length) renderPages(currentShuffledWords);
+            else generateAllPages();
+        });
+
+        document.getElementById('fetchWordsBtn').addEventListener('click', addWordsFromInput);
+        document.getElementById('generateBtn').addEventListener('click', generateAllPages);
+        document.getElementById('reshuffleBtn').addEventListener('click', () => {
+            if (currentShuffledWords.length) { currentShuffledWords = shuffleArray([...currentShuffledWords]); renderPages(currentShuffledWords); }
+            else generateAllPages();
+        });
+        document.getElementById('printBtn').addEventListener('click', () => window.print());
+        document.getElementById('applyPaperBtn').addEventListener('click', () => { if(currentShuffledWords.length) renderPages(currentShuffledWords); else generateAllPages(); });
+        radioEnglish.addEventListener('change', () => { if(currentShuffledWords.length) renderPages(currentShuffledWords); else generateAllPages(); });
+        radioChinese.addEventListener('change', () => { if(currentShuffledWords.length) renderPages(currentShuffledWords); else generateAllPages(); });
+        bookSelect.addEventListener('change', e => switchBook(e.target.value));
+        document.getElementById('newBookBtn').addEventListener('click', () => {
+            const name = prompt('新词书名称：'); if (name && !books[name]) { books[name] = { batches: [] }; saveBooks(); currentBookName = name; selectedEnglish.clear(); updateBookSelect(); renderMainPanels(); generateAllPages(); }
+        });
+        document.getElementById('deleteBookBtn').addEventListener('click', () => {
+            if (Object.keys(books).length <= 1) return alert('至少保留一个词书');
+            if (confirm(`删除“${currentBookName}”？`)) { delete books[currentBookName]; saveBooks(); currentBookName = Object.keys(books)[0]; selectedEnglish.clear(); updateBookSelect(); renderMainPanels(); generateAllPages(); }
+        });
+
+        // 管理批次（保持不变）
+        document.getElementById('manageBatchesBtn').addEventListener('click', openBatchManager);
+        function openBatchManager() {
+            const book = getBook();
+            const allBatches = book.batches.filter(b => b.name !== MASTERED_BATCH_NAME);
+            const topLevelBatches = allBatches.filter(b => !b.parentId);
+            const regularBatches = getRegularBatches();
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal" style="max-width:960px;">
+                    <h3>📁 批次管理 · 单击展开/折叠</h3>
+                    <div class="extract-bar">
+                        <span style="font-weight:500;">📤 提取选中单词到：</span>
+                        <select id="extractTargetSelect" style="flex:1; min-width:160px;">
+                            ${regularBatches.map(b => `<option value="${b.id}">${b.name}</option>`).join('')}
+                            <option value="__new__">🆕 新建单词夹...</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" id="extractBtn">提取</button>
+                        <span style="color:#888; font-size:0.8rem;">先在上方面板或此处选中单词</span>
+                    </div>
+                    <div id="batchList" style="margin-top:12px;"></div>
+                    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+                        <button class="btn" id="closeBatchModal">关闭</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            const list = modal.querySelector('#batchList');
+
+            function renderBatchRow(batch, container, isSub = false) {
+                const row = document.createElement('div');
+                row.className = 'batch-row';
+                if (isSub) row.style.marginLeft = '24px';
+                row.dataset.batchId = batch.id;
+
+                const header = document.createElement('div');
+                header.className = 'batch-row-header';
+
+                const leftGroup = document.createElement('div');
+                leftGroup.style.display = 'flex';
+                leftGroup.style.alignItems = 'center';
+                leftGroup.style.gap = '8px';
+
+                const titleSpan = document.createElement('span');
+                titleSpan.style.fontWeight = '500';
+                titleSpan.textContent = `${isSub ? '📄' : '📦'} ${batch.name} (${batch.words.length})`;
+                if (batch.children) {
+                    titleSpan.innerHTML += `<span class="group-badge">组</span>`;
+                }
+                leftGroup.appendChild(titleSpan);
+                header.appendChild(leftGroup);
+
+                const rightGroup = document.createElement('div');
+                rightGroup.style.display = 'flex';
+                rightGroup.style.gap = '8px';
+                rightGroup.style.alignItems = 'center';
+
+                if (!batch.children) {
+                    const selectAllBtn = document.createElement('button');
+                    selectAllBtn.className = 'btn btn-sm';
+                    selectAllBtn.textContent = '全选';
+                    selectAllBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        batch.words.forEach(w => { if (!w.mastered) selectedEnglish.add(w.english.toLowerCase()); });
+                        refreshAllCards();
+                    });
+                    const deselectAllBtn = document.createElement('button');
+                    deselectAllBtn.className = 'btn btn-sm';
+                    deselectAllBtn.textContent = '全不选';
+                    deselectAllBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        batch.words.forEach(w => selectedEnglish.delete(w.english.toLowerCase()));
+                        refreshAllCards();
+                    });
+                    rightGroup.appendChild(selectAllBtn);
+                    rightGroup.appendChild(deselectAllBtn);
+                }
+
+                const renameBtn = document.createElement('button');
+                renameBtn.className = 'btn btn-sm';
+                renameBtn.textContent = '✏️重命名';
+                renameBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const newName = prompt('新名称', batch.name);
+                    if (newName && newName.trim()) {
+                        batch.name = newName.trim();
+                        saveBooks();
+                        renderMainPanels();
+                        modal.remove();
+                        openBatchManager();
+                    }
+                });
+                rightGroup.appendChild(renameBtn);
+
+                const deleteBatchBtn = document.createElement('button');
+                deleteBatchBtn.className = 'btn btn-sm';
+                deleteBatchBtn.style.color = '#c44';
+                deleteBatchBtn.textContent = '🗑️删除夹';
+                deleteBatchBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm(`确定删除整个单词夹“${batch.name}”及其所有单词吗？`)) {
+                        const idx = book.batches.findIndex(b => b.id === batch.id);
+                        if (idx !== -1) book.batches.splice(idx, 1);
+                        saveBooks();
+                        selectedEnglish.clear();
+                        renderMainPanels();
+                        updateBookSelect();
+                        generateAllPages();
+                        modal.remove();
+                        openBatchManager();
+                    }
+                });
+                rightGroup.appendChild(deleteBatchBtn);
+                header.appendChild(rightGroup);
+
+                const arrow = document.createElement('span');
+                arrow.textContent = '▼';
+                arrow.style.marginLeft = '8px';
+                header.appendChild(arrow);
+
+                const body = document.createElement('div');
+                body.className = 'batch-row-body';
+
+                if (batch.children) {
+                    body.style.display = 'none';
+                    body.style.padding = '8px';
+                    body.style.gridTemplateColumns = '1fr';
+                    batch.children.forEach(child => {
+                        const childBatch = book.batches.find(b => b.id === child.id);
+                        if (childBatch) {
+                            renderBatchRow(childBatch, body, true);
+                        }
+                    });
+                } else {
+                    if (batch.words.length === 0) {
+                        body.innerHTML = '<p style="color:#aaa; padding:8px; grid-column:1/-1;">此批次暂无单词</p>';
+                    } else {
+                        batch.words.forEach(w => {
+                            const card = document.createElement('div');
+                            card.className = 'batch-word-item' + (selectedEnglish.has(w.english.toLowerCase()) ? ' selected' : '');
+                            card.dataset.english = w.english;
+                            card.title = `${w.english} ${w.chinese}`;
+
+                            const textSpan = document.createElement('span');
+                            textSpan.className = 'batch-word-text';
+                            textSpan.innerHTML = `${w.english} <small>${w.chinese}</small>${w.mastered ? ' <span style="color:#c00;">[熟]</span>' : ''}`;
+
+                            const actionsDiv = document.createElement('div');
+                            actionsDiv.className = 'batch-word-actions';
+                            if (!w.mastered) {
+                                const masterBtn = document.createElement('button');
+                                masterBtn.className = 'btn btn-sm';
+                                masterBtn.textContent = '⭐标熟';
+                                masterBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    if (moveWordToMastered(w.english)) {
+                                        saveBooks();
+                                        renderMainPanels();
+                                        generateAllPages();
+                                        modal.remove();
+                                        openBatchManager();
+                                    }
+                                });
+                                actionsDiv.appendChild(masterBtn);
+                            }
+                            const delBtn = document.createElement('button');
+                            delBtn.className = 'btn btn-sm';
+                            delBtn.textContent = '🗑️删除';
+                            delBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                if (confirm(`确定删除单词"${w.english}"吗？`)) {
+                                    if (deleteWord(w.english)) {
+                                        saveBooks();
+                                        renderMainPanels();
+                                        generateAllPages();
+                                        modal.remove();
+                                        openBatchManager();
+                                    }
+                                }
+                            });
+                            actionsDiv.appendChild(delBtn);
+                            card.appendChild(textSpan);
+                            card.appendChild(actionsDiv);
+                            body.appendChild(card);
+                        });
+                    }
+                }
+
+                header.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'BUTTON' || e.target.type === 'checkbox') return;
+                    body.classList.toggle('open');
+                    arrow.textContent = body.classList.contains('open') ? '▲' : '▼';
+                });
+
+                if (!batch.children) bindSwipe(body);
+                row.appendChild(header);
+                row.appendChild(body);
+                container.appendChild(row);
+                return row;
+            }
+
+            if (!topLevelBatches.length) {
+                list.innerHTML = '<p style="color:#888; padding:12px;">暂无批次，请先添加单词。</p>';
+            } else {
+                topLevelBatches.forEach(batch => renderBatchRow(batch, list));
+            }
+
+            modal.querySelector('#extractBtn').addEventListener('click', () => {
+                if (selectedEnglish.size === 0) return alert('请先选中至少一个单词');
+                const select = modal.querySelector('#extractTargetSelect');
+                const targetId = select.value;
+                if (targetId === '__new__') {
+                    const name = prompt('请输入新单词夹名称：');
+                    if (!name || !name.trim()) return;
+                    const newBatch = { id: Date.now().toString(), name: name.trim(), words: [] };
+                    book.batches.unshift(newBatch);
+                    const moved = moveWordsToBatch(Array.from(selectedEnglish), newBatch.id);
+                    if (moved > 0) {
+                        saveBooks();
+                        selectedEnglish.clear();
+                        renderMainPanels();
+                        updateBookSelect();
+                        generateAllPages();
+                        modal.remove();
+                        openBatchManager();
+                        alert(`已提取 ${moved} 个单词到“${name}”`);
+                    } else {
+                        alert('没有单词被移动');
+                    }
+                } else {
+                    const targetBatch = book.batches.find(b => b.id === targetId);
+                    if (!targetBatch) return alert('目标单词夹不存在');
+                    const moved = moveWordsToBatch(Array.from(selectedEnglish), targetBatch.id);
+                    if (moved > 0) {
+                        saveBooks();
+                        selectedEnglish.clear();
+                        renderMainPanels();
+                        updateBookSelect();
+                        generateAllPages();
+                        modal.remove();
+                        openBatchManager();
+                        alert(`已提取 ${moved} 个单词到“${targetBatch.name}”`);
+                    } else {
+                        alert('没有单词被移动（可能已不存在或已在目标批次）');
+                    }
+                }
+            });
+
+            modal.querySelector('#closeBatchModal').addEventListener('click', () => modal.remove());
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        }
+    })();
+</script>
+</body>
+</html>
